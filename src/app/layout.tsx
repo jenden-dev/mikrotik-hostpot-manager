@@ -24,7 +24,29 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'NETROTIK — Hotspot Manager',
-  description: 'Generate and print hotspot vouchers — NETROTIK',
+  description: 'Generate and manage MikroTik hotspot vouchers with ease. Fast, simple, and powerful hotspot voucher manager.',
+  themeColor: '#4F46E5',
+  openGraph: {
+    type: 'website',
+    url: 'https://netrotik.net/',
+    siteName: 'NETROTIK',
+    title: 'NETROTIK — Hotspot Voucher Manager',
+    description: 'Generate and manage MikroTik hotspot vouchers with ease. Fast, simple, and powerful hotspot voucher manager.',
+    images: [
+      {
+        url: 'https://netrotik.net/og-image.png',
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'en_PH',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NETROTIK — Hotspot Voucher Manager',
+    description: 'Generate and manage MikroTik hotspot vouchers with ease. Fast, simple, and powerful.',
+    images: ['https://netrotik.net/og-image.png'],
+  },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

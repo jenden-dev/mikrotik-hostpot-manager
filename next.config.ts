@@ -5,11 +5,12 @@ const isDev = process.env.NODE_ENV === 'development'
 const CSP = [
   "default-src 'self'",
   // Next.js needs unsafe-inline for hydration; unsafe-eval only in dev (HMR)
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  "img-src 'self' data: blob: https://www.gstatic.com/",
+  "connect-src 'self' https://www.google.com/recaptcha/",
+  "frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

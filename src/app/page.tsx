@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import ReCAPTCHA from 'react-google-recaptcha'
 import type { MikrotikCreds } from '@/types'
+
+const SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? ''
 
 export default function LoginPage() {
   const router = useRouter()
@@ -12,12 +15,14 @@ export default function LoginPage() {
     username: 'admin',
     password: '',
   })
-  const [rememberMe, setRememberMe]   = useState(false)
+  const [rememberMe, setRememberMe]     = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading]       = useState(false)
-  const [showPrivacy, setShowPrivacy] = useState(false)
-  const [showCookies, setShowCookies] = useState(false)
-  const [error, setError] = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [showPrivacy, setShowPrivacy]   = useState(false)
+  const [showCookies, setShowCookies]   = useState(false)
+  const [error, setError]               = useState('')
+  const [showCaptcha, setShowCaptcha]   = useState(false)
+  const recaptchaRef = useRef<ReCAPTCHA>(null)
 
   // Pre-fill form from saved credentials
   useEffect(() => {
@@ -28,10 +33,16 @@ export default function LoginPage() {
     }
   }, [])
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+    setShowCaptcha(true)
+  }
+
+  async function handleCaptchaVerify(token: string | null) {
+    if (!token) return
+    setShowCaptcha(false)
+    setLoading(true)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -53,6 +64,7 @@ export default function LoginPage() {
       setError('Cannot connect — check network or router IP')
     } finally {
       setLoading(false)
+      recaptchaRef.current?.reset()
     }
   }
 
@@ -459,6 +471,35 @@ export default function LoginPage() {
                 Got it
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* reCAPTCHA modal */}
+      {showCaptcha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 flex flex-col items-center gap-4 w-full max-w-xs">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-7 h-7 rounded-sm bg-[#CC0000]">
+                <span className="text-white font-black text-xs leading-none">M</span>
+              </span>
+              <span className="text-base font-bold text-slate-800" style={{ fontFamily: 'var(--font-heading)' }}>
+                NETROTIK
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 text-center">Please verify you&apos;re human before connecting.</p>
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={SITE_KEY}
+              onChange={handleCaptchaVerify}
+            />
+            <button
+              type="button"
+              onClick={() => { setShowCaptcha(false); recaptchaRef.current?.reset() }}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
