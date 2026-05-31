@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { rosCmd, isMacAddress, resolveMacToIp } from '@/lib/mikrotik'
+import { NextRequest } from 'next/server'
+import { rosCmd, rosCmdWithProgress, isMacAddress, resolveMacToIp } from '@/lib/mikrotik'
 import { parseCreds } from '@/lib/validate'
 
 export async function POST(req: NextRequest) {
@@ -11,31 +11,64 @@ export async function POST(req: NextRequest) {
   const { codes }: { codes: string[] } = body
 
   if (!Array.isArray(codes) || codes.length === 0)
-    return NextResponse.json({ error: 'No codes provided' }, { status: 400 })
+    return Response.json({ error: 'No codes provided' }, { status: 400 })
 
-  try {
-    const resolvedHost = isMacAddress(creds.host) ? await resolveMacToIp(creds.host) : creds.host
+  const enc = new TextEncoder()
+  const send = (data: object) => enc.encode(`data: ${JSON.stringify(data)}\n\n`)
 
-    // Fetch all hotspot users to find matching IDs by name
-    const listResult = await rosCmd(resolvedHost, creds.port, creds.username, creds.password, [
-      ['/ip/hotspot/user/print'],
-    ])
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const resolvedHost = isMacAddress(creds.host) ? await resolveMacToIp(creds.host) : creds.host
 
-    const codeSet = new Set(codes)
-    const matchedIds = listResult[0]
-      .filter((r) => r.type === '!re' && codeSet.has(r.attrs['name']))
-      .map((r) => r.attrs['.id'])
-      .filter(Boolean)
+        // Step 1 — find matching user IDs
+        controller.enqueue(send({ stage: 'lookup', progress: 0, total: codes.length }))
 
-    if (matchedIds.length === 0)
-      return NextResponse.json({ deleted: 0, notFound: codes.length })
+        const listResult = await rosCmd(resolvedHost, creds.port, creds.username, creds.password, [
+          ['/ip/hotspot/user/print'],
+        ])
 
-    // Delete each matched user by ID
-    const deleteCommands = matchedIds.map((id) => ['/ip/hotspot/user/remove', `=.id=${id}`])
-    await rosCmd(resolvedHost, creds.port, creds.username, creds.password, deleteCommands)
+        const codeSet = new Set(codes)
+        const matchedIds = listResult[0]
+          .filter((r) => r.type === '!re' && codeSet.has(r.attrs['name']))
+          .map((r) => r.attrs['.id'])
+          .filter(Boolean) as string[]
 
-    return NextResponse.json({ deleted: matchedIds.length, notFound: codes.length - matchedIds.length })
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 })
-  }
+        if (matchedIds.length === 0) {
+          controller.enqueue(send({ done: true, deleted: 0, notFound: codes.length }))
+          controller.close()
+          return
+        }
+
+        // Step 2 — delete with progress
+        controller.enqueue(send({ stage: 'deleting', progress: 0, total: matchedIds.length }))
+
+        const deleteCommands = matchedIds.map((id) => ['/ip/hotspot/user/remove', `=.id=${id}`])
+
+        await rosCmdWithProgress(
+          resolvedHost,
+          creds.port,
+          creds.username,
+          creds.password,
+          deleteCommands,
+          (done, total) => controller.enqueue(send({ stage: 'deleting', progress: done, total }))
+        )
+
+        controller.enqueue(send({ done: true, deleted: matchedIds.length, notFound: codes.length - matchedIds.length }))
+        controller.close()
+      } catch (err) {
+        controller.enqueue(send({ error: (err as Error).message }))
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':      'text/event-stream',
+      'Cache-Control':     'no-cache',
+      'Connection':        'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }

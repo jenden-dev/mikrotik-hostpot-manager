@@ -101,14 +101,49 @@ input, select, textarea {
   display: none;
 }
 
-/* ─── Print: show only the voucher area, hide everything else ─── */
+/* ─── Print: show only the voucher area, no margins, no gaps ─── */
 @media print {
+  @page { margin: 0; }
+
+  html, body { margin: 0 !important; padding: 0 !important; }
+
   body * { visibility: hidden; }
   #print-area, #print-area * { visibility: visible; }
+
   #print-area {
     display: block !important;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  #print-area .voucher-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    align-content: flex-start;
+    box-sizing: border-box;
+  }
+
+  #print-area .credentials-grid > * {
+    width: calc(100% / 5) !important;   /* credentials style: 5 per row for wider cards */
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #print-area .voucher-grid > * {
+    width: calc(100% / 6) !important;   /* voucher style: 6 per row */
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

@@ -42,7 +42,7 @@ export interface RosResponse {
 class RosSocket {
   private sock: Socket
   private buf: Buffer = Buffer.alloc(0)
-  private pendingRead: { n: number; resolve: (buf: Buffer) => void } | null = null
+  private pendingRead: { n: number; resolve: (buf: Buffer) => void; reject: (err: Error) => void } | null = null
 
   constructor(private host: string, private port: number, private timeout = 8000) {
     this.sock = new Socket()
@@ -55,10 +55,21 @@ class RosSocket {
         this.buf = Buffer.concat([this.buf, chunk])
         this.processRead()
       })
-      this.sock.on('error', reject)
+      this.sock.on('error', (err) => {
+        if (this.pendingRead) { this.pendingRead.reject(err); this.pendingRead = null }
+        reject(err)
+      })
+      this.sock.on('close', () => {
+        if (this.pendingRead) {
+          this.pendingRead.reject(new Error('MikroTik connection closed unexpectedly'))
+          this.pendingRead = null
+        }
+      })
       this.sock.on('timeout', () => {
         this.sock.destroy()
-        reject(new Error('Connection timed out — check IP and port'))
+        const err = new Error('Connection timed out — check IP and port')
+        if (this.pendingRead) { this.pendingRead.reject(err); this.pendingRead = null }
+        reject(err)
       })
       this.sock.connect(this.port, this.host, resolve)
     })
@@ -76,14 +87,14 @@ class RosSocket {
   }
 
   private readBytes(n: number): Promise<Buffer> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (n === 0) { resolve(Buffer.alloc(0)); return }
       if (this.buf.length >= n) {
         const result = Buffer.from(this.buf.slice(0, n))
         this.buf = this.buf.slice(n)
         resolve(result)
       } else {
-        this.pendingRead = { n, resolve }
+        this.pendingRead = { n, resolve, reject }
       }
     })
   }

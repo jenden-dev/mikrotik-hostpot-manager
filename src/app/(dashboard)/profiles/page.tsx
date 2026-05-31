@@ -245,7 +245,7 @@ export default function ProfilesPage() {
       {/* Add / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-violet-700 px-6 pt-5 pb-6 text-white relative">
               <button type="button" onClick={() => setShowModal(false)}
                 className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-lg
@@ -274,37 +274,37 @@ export default function ProfilesPage() {
               </div>
 
               <div>
-                <label className={labelCls}>Rate Limit <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                <label className={labelCls}>Rate Limit <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span></label>
                 <input type="text" placeholder="e.g. 2M/5M or 512k/1M" value={form.rateLimit}
                   onChange={(e) => setForm((f) => ({ ...f, rateLimit: e.target.value }))}
                   className={inputCls} />
-                <p className="text-[10px] text-slate-400 mt-1">Format: upload/download (e.g. 1M/2M)</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Format: upload/download (e.g. 1M/2M)</p>
               </div>
 
               <div>
-                <label className={labelCls}>Session Timeout <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                <label className={labelCls}>Session Timeout <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span></label>
                 <input type="text" placeholder="e.g. 1h, 00:30:00" value={form.sessionTimeout}
                   onChange={(e) => setForm((f) => ({ ...f, sessionTimeout: e.target.value }))}
                   className={inputCls} />
               </div>
 
               <div>
-                <label className={labelCls}>Idle Timeout <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                <label className={labelCls}>Idle Timeout <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span></label>
                 <input type="text" placeholder="e.g. 5m, 00:05:00" value={form.idleTimeout}
                   onChange={(e) => setForm((f) => ({ ...f, idleTimeout: e.target.value }))}
                   className={inputCls} />
               </div>
 
               <div>
-                <label className={labelCls}>Shared Users <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                <label className={labelCls}>Shared Users <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span></label>
                 <input type="number" min={1} placeholder="1" value={form.sharedUsers}
                   onChange={(e) => setForm((f) => ({ ...f, sharedUsers: e.target.value }))}
                   className={inputCls} />
-                <p className="text-[10px] text-slate-400 mt-1">Max devices that can share this login simultaneously</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Max devices that can share this login simultaneously</p>
               </div>
 
               <div>
-                <label className={labelCls}>Address Pool <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                <label className={labelCls}>Address Pool <span className="text-slate-400 dark:text-slate-500 normal-case font-normal">(optional)</span></label>
                 <input type="text" placeholder="e.g. hs-pool-3" value={form.addressPool}
                   onChange={(e) => setForm((f) => ({ ...f, addressPool: e.target.value }))}
                   className={inputCls} />
@@ -313,7 +313,7 @@ export default function ProfilesPage() {
 
             <div className="px-6 pb-5 pt-2 flex gap-2">
               <button type="button" onClick={() => setShowModal(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50
+                className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700
                            text-sm font-semibold rounded-xl transition-colors">
                 Cancel
               </button>

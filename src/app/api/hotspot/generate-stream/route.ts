@@ -10,6 +10,10 @@ const CHAR_SETS: Record<string, string> = {
   uppercase:    'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
 }
 
+// Max commands per MikroTik session — keeps each connection short-lived
+// to avoid router-side connection timeouts on large batches.
+const BATCH_SIZE = 200
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const result = parseCreds(body)
@@ -64,14 +68,23 @@ export async function POST(req: NextRequest) {
           return words
         })
 
-        await rosCmdWithProgress(
-          resolvedHost,
-          Number(port) || 8728,
-          username,
-          password ?? '',
-          commands,
-          (done, total) => send({ progress: done, total })
-        )
+        // Split into batches — each batch opens its own fresh MikroTik connection
+        // so the router never hits its per-session command limit.
+        let done = 0
+        for (let i = 0; i < commands.length; i += BATCH_SIZE) {
+          const batch = commands.slice(i, i + BATCH_SIZE)
+          await rosCmdWithProgress(
+            resolvedHost,
+            Number(port) || 8728,
+            username,
+            password ?? '',
+            batch,
+            (batchDone) => {
+              done = i + batchDone
+              send({ progress: done, total: qty })
+            }
+          )
+        }
 
         const createdAt = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
         const vouchers = codes.map((code) => ({

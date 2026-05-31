@@ -103,9 +103,9 @@ export default function SetupModal({ initial, onSave, onCancel }: Props) {
                 name="currency"
                 value={currencySelect}
                 onChange={(e) => setCurrencySelect(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900
-                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white
-                           transition appearance-none"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-600
+                           transition appearance-none dark:[color-scheme:dark]"
               >
                 {CURRENCIES.map((c) => (
                   <option key={c.symbol} value={c.symbol}>{c.label}</option>

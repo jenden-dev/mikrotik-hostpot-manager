@@ -65,11 +65,10 @@ export default function PrintOptionsModal({ onConfirm, onCancel }: Props) {
           {/* Card Design */}
           <div>
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Card Design</p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {([
-                { value: 1 as CardDesign, label: 'Classic',    sub: '35×22mm' },
-                { value: 2 as CardDesign, label: 'Credential', sub: '35×22mm' },
-                { value: 3 as CardDesign, label: 'QR Code',    sub: '35×35mm' },
+                { value: 1 as CardDesign, label: 'Classic', sub: '35×22mm' },
+                { value: 3 as CardDesign, label: 'QR Code',  sub: '35×35mm' },
               ]).map((d) => (
                 <button key={d.value} onClick={() => setOpts({ ...opts, design: d.value })}
                   className={`py-2 rounded-xl border text-center transition-colors

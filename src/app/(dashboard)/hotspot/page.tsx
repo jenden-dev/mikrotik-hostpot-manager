@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [confirmDeleteBatch, setConfirmDeleteBatch] = useState<Batch | null>(null)
   const [deletingBatch, setDeletingBatch]           = useState(false)
   const [deleteError, setDeleteError]               = useState('')
+  const [deleteProgress, setDeleteProgress]         = useState<{ stage: string; current: number; total: number } | null>(null)
 
   const [pendingPrintBatch, setPendingPrintBatch] = useState<Batch | null>(null)
   const [printingBatch, setPrintingBatch]         = useState<Batch | null>(null)
@@ -201,7 +202,13 @@ export default function DashboardPage() {
               return [...prev, { id: newId, batchNumber: prev.length + 1, createdAt: data.createdAt, profile: form.profile, timeLimitLabel: timeParsed?.label ?? form.timeLimitInput, amount: form.amount, vouchers: data.vouchers }]
             })
             setActiveTab('batches')
-            setForm((f) => ({ ...f, quantity: 1, amount: '', timeLimitInput: '1h', server: '', dataLimit: '', comment: '' }))
+            setForm((f) => ({
+              ...f,
+              quantity: 1, amount: '', timeLimitInput: '1h',
+              advancedForm: false, server: '', nameLength: 8,
+              characters: 'alphanumeric', customChars: '',
+              dataLimit: '', dataUnit: 'MB', comment: '',
+            }))
             setAllPage(1); setSearch('')
           }
           if (data.error) setGenerateError(data.error)
@@ -249,6 +256,7 @@ export default function DashboardPage() {
     if (!creds) return
     setDeletingBatch(true)
     setDeleteError('')
+    setDeleteProgress({ stage: 'lookup', current: 0, total: batch.vouchers.length })
     try {
       const codes = batch.vouchers.map((v) => v.code)
       const res = await fetch('/api/hotspot/batch-delete', {
@@ -256,14 +264,34 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...creds, codes }),
       })
-      const data = await res.json()
-      if (!res.ok) { setDeleteError(data.error || 'Delete from MikroTik failed'); return }
-      removeBatchLocally(batch)
-      setConfirmDeleteBatch(null)
+      if (!res.body) { setDeleteError('No response from server'); return }
+
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = JSON.parse(line.slice(6))
+          if (data.error) { setDeleteError(data.error); return }
+          if (data.stage) setDeleteProgress({ stage: data.stage, current: data.progress, total: data.total })
+          if (data.done) {
+            removeBatchLocally(batch)
+            setConfirmDeleteBatch(null)
+          }
+        }
+      }
     } catch {
       setDeleteError('Network error — try again')
     } finally {
       setDeletingBatch(false)
+      setDeleteProgress(null)
     }
   }
   function handleSetupSave(newConfig: AppConfig) {
@@ -319,25 +347,47 @@ export default function DashboardPage() {
             </div>
 
             <div className="px-6 pb-5 pt-2 flex flex-col gap-2">
-              <button type="button"
-                disabled={deletingBatch}
-                onClick={() => deleteBatchFromMikrotik(confirmDeleteBatch)}
-                className="w-full py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
-                {deletingBatch ? 'Deleting from MikroTik…' : 'Delete from MikroTik + Local List'}
-              </button>
-              <button type="button"
-                disabled={deletingBatch}
-                onClick={() => { removeBatchLocally(confirmDeleteBatch); setConfirmDeleteBatch(null) }}
-                className="w-full py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300
-                           hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-semibold rounded-xl transition-colors">
-                Local List Only
-              </button>
-              <button type="button"
-                disabled={deletingBatch}
-                onClick={() => setConfirmDeleteBatch(null)}
-                className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center">
-                Cancel
-              </button>
+              {deletingBatch && deleteProgress ? (
+                /* Progress bar replaces buttons while deleting */
+                <div className="space-y-2 py-1">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <span>
+                      {deleteProgress.stage === 'lookup' ? 'Looking up users…' : 'Deleting from MikroTik…'}
+                    </span>
+                    <span className="text-indigo-600 dark:text-indigo-400 tabular-nums">
+                      {deleteProgress.current.toLocaleString()} / {deleteProgress.total.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300"
+                      style={{ width: deleteProgress.total > 0 ? `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%` : '5%' }}
+                    />
+                  </div>
+                  <p className="text-right text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+                    {deleteProgress.total > 0 ? `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%` : '0%'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <button type="button"
+                    onClick={() => deleteBatchFromMikrotik(confirmDeleteBatch)}
+                    className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors">
+                    Delete from MikroTik + Local List
+                  </button>
+                  <button type="button"
+                    onClick={() => { removeBatchLocally(confirmDeleteBatch); setConfirmDeleteBatch(null) }}
+                    className="w-full py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300
+                               hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-semibold rounded-xl transition-colors">
+                    Local List Only
+                  </button>
+                  <button type="button"
+                    onClick={() => setConfirmDeleteBatch(null)}
+                    className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center">
+                    Cancel
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -429,7 +479,7 @@ export default function DashboardPage() {
                   disabled={serversLoading}
                   className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100
                              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white
-                             disabled:opacity-60 transition appearance-none">
+                             disabled:opacity-60 transition appearance-none dark:[color-scheme:dark]">
                   <option value="">— Any server (default) —</option>
                   {serversLoading && <option disabled>Loading…</option>}
                   {servers.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -456,7 +506,7 @@ export default function DashboardPage() {
                 <select value={form.characters}
                   onChange={(e) => setForm((f) => ({ ...f, characters: e.target.value }))}
                   className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition appearance-none">
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition appearance-none dark:[color-scheme:dark]">
                   <option value="alphanumeric">Alphanumeric (A-Z, a-z, 0-9)</option>
                   <option value="numeric">Numeric only (0-9)</option>
                   <option value="alpha">Letters only (A-Z, a-z)</option>
@@ -485,7 +535,7 @@ export default function DashboardPage() {
                   <select value={form.dataUnit}
                     onChange={(e) => setForm((f) => ({ ...f, dataUnit: e.target.value }))}
                     className="px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100
-                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition appearance-none">
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition appearance-none dark:[color-scheme:dark]">
                     <option value="MB">MB</option>
                     <option value="GB">GB</option>
                   </select>
@@ -579,7 +629,7 @@ export default function DashboardPage() {
                     onChange={(e) => setForm({ ...form, profile: e.target.value })}
                     className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100
                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white
-                               disabled:opacity-60 disabled:cursor-not-allowed transition appearance-none">
+                               disabled:opacity-60 disabled:cursor-not-allowed transition appearance-none dark:[color-scheme:dark]">
                     {profilesLoading && <option value="">Loading profiles…</option>}
                     {profilesError   && <option value="">{profilesError}</option>}
                     {!profilesLoading && !profilesError && profiles.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -593,7 +643,9 @@ export default function DashboardPage() {
                     placeholder="e.g. 1h30m, 2h, 30m, 1d"
                     className={`w-full px-3 py-2.5 border rounded-xl text-sm transition
                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                      ${form.timeLimitInput && !timeValid ? 'border-red-300 bg-red-50 text-red-900' : 'border-slate-200 bg-slate-50 text-slate-900 focus:bg-white'}`} />
+                      ${form.timeLimitInput && !timeValid
+                        ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-300'
+                        : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-600'}`} />
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {[
                       { label: '30m',   value: '30m'   },
@@ -869,7 +921,7 @@ export default function DashboardPage() {
       {/* Print area */}
       <div id="print-area">
         {printingBatch && printOptions && (
-          <div className="voucher-grid">
+          <div className={`voucher-grid${printOptions.style === 'user' ? ' credentials-grid' : ''}`}>
             {printingBatch.vouchers.map((v, i) => (
               <VoucherPrintCard key={v.code} voucher={v} index={i}
                 hotspotName={config?.hotspotName ?? ''} currency={config?.currency ?? '₱'}
